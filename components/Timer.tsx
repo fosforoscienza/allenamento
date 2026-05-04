@@ -6,6 +6,8 @@ import { WorkoutPlan } from "@/lib/generator";
 import ExerciseSvg from "./ExerciseSvg";
 
 type Phase =
+  | { kind: "warmup"; idx: number }
+  | { kind: "warmupRest"; idx: number }
   | { kind: "work"; exerciseIdx: number; round: number }
   | { kind: "rest"; exerciseIdx: number; round: number }
   | { kind: "roundRest"; round: number }
@@ -13,6 +15,12 @@ type Phase =
 
 function buildPhases(plan: WorkoutPlan): Phase[] {
   const phases: Phase[] = [];
+  for (let i = 0; i < plan.warmup.length; i++) {
+    phases.push({ kind: "warmup", idx: i });
+    if (i < plan.warmup.length - 1) {
+      phases.push({ kind: "warmupRest", idx: i });
+    }
+  }
   for (let r = 0; r < plan.rounds; r++) {
     for (let i = 0; i < plan.exercises.length; i++) {
       phases.push({ kind: "work", exerciseIdx: i, round: r });
@@ -32,7 +40,12 @@ function buildPhases(plan: WorkoutPlan): Phase[] {
 }
 
 function phaseSeconds(phase: Phase, plan: WorkoutPlan): number {
+  const warmupSec = Math.round(plan.warmupSeconds / Math.max(1, plan.warmup.length));
   switch (phase.kind) {
+    case "warmup":
+      return warmupSec;
+    case "warmupRest":
+      return 5;
     case "work":
       return plan.workSeconds;
     case "rest":
@@ -100,6 +113,8 @@ export default function Timer({ plan }: { plan: WorkoutPlan }) {
         beep(880, 600);
       } else if (nextPhase.kind === "work") {
         beep(880, 250);
+      } else if (nextPhase.kind === "warmup") {
+        beep(660, 150);
       } else {
         beep(440, 200);
       }
@@ -133,182 +148,243 @@ export default function Timer({ plan }: { plan: WorkoutPlan }) {
   const elapsedSecondsBefore = phases
     .slice(0, phaseIdx)
     .reduce((acc, p) => acc + phaseSeconds(p, plan), 0);
-  const elapsed = elapsedSecondsBefore + (phaseSeconds(phase, plan) - secondsLeft);
-  const progress = Math.min(100, (elapsed / totalSeconds) * 100);
+  const elapsed =
+    elapsedSecondsBefore + (phaseSeconds(phase, plan) - secondsLeft);
+  const progress = Math.min(100, Math.max(0, (elapsed / totalSeconds) * 100));
 
   if (phase.kind === "done") {
     return (
-      <div className="rounded-2xl bg-emerald-50 p-8 text-center ring-1 ring-emerald-200">
-        <h2 className="text-3xl font-bold text-emerald-700">
+      <div className="card p-10 text-center border-emerald-500/40 bg-emerald-500/5">
+        <div className="mx-auto h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center">
+          <svg
+            viewBox="0 0 24 24"
+            className="h-8 w-8 text-emerald-400"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h2 className="mt-5 text-3xl font-bold text-white">
           Allenamento completato!
         </h2>
-        <p className="mt-2 text-emerald-800">
-          Ottimo lavoro. Ricordati lo stretching.
+        <p className="mt-2 text-emerald-200/80">
+          Ottimo lavoro. Concediti uno stretching di 2-3 minuti.
         </p>
-        <button
-          onClick={reset}
-          className="mt-6 rounded-xl bg-emerald-600 px-6 py-3 font-semibold text-white hover:bg-emerald-700"
-        >
+        <button onClick={reset} className="btn-primary mt-6">
           Ricomincia
         </button>
       </div>
     );
   }
 
+  const isWarmupPhase = phase.kind === "warmup" || phase.kind === "warmupRest";
+
   const currentExercise: Exercise | null =
-    phase.kind === "work" || phase.kind === "rest"
+    phase.kind === "warmup"
+      ? plan.warmup[phase.idx]
+      : phase.kind === "warmupRest"
+      ? plan.warmup[phase.idx]
+      : phase.kind === "work" || phase.kind === "rest"
       ? plan.exercises[phase.exerciseIdx]
-      : phase.kind === "roundRest"
-      ? plan.exercises[0]
       : null;
 
   const nextExercise: Exercise | null = (() => {
     for (let i = phaseIdx + 1; i < phases.length; i++) {
       const p = phases[i];
+      if (p.kind === "warmup") return plan.warmup[p.idx];
       if (p.kind === "work") return plan.exercises[p.exerciseIdx];
     }
     return null;
   })();
 
   const phaseLabel =
-    phase.kind === "work"
+    phase.kind === "warmup"
+      ? "RISCALDAMENTO"
+      : phase.kind === "warmupRest"
+      ? "TRANSIZIONE"
+      : phase.kind === "work"
       ? "LAVORO"
       : phase.kind === "rest"
       ? "RIPOSO"
       : "PAUSA TRA I GIRI";
 
-  const phaseColor =
-    phase.kind === "work"
-      ? "bg-brand-600 text-white"
+  const phaseAccent =
+    phase.kind === "warmup"
+      ? "from-violet-500 to-fuchsia-500"
+      : phase.kind === "warmupRest"
+      ? "from-slate-600 to-slate-500"
+      : phase.kind === "work"
+      ? "from-sky-500 to-indigo-500"
       : phase.kind === "rest"
-      ? "bg-amber-400 text-amber-950"
-      : "bg-slate-700 text-white";
+      ? "from-amber-500 to-orange-500"
+      : "from-slate-700 to-slate-600";
 
   const ringColor =
-    phase.kind === "work" ? "stroke-brand-500" : "stroke-amber-400";
+    phase.kind === "warmup"
+      ? "stroke-violet-400"
+      : phase.kind === "work"
+      ? "stroke-sky-400"
+      : phase.kind === "rest"
+      ? "stroke-amber-400"
+      : "stroke-slate-400";
 
-  const ringRadius = 90;
+  const ringRadius = 88;
   const circumference = 2 * Math.PI * ringRadius;
   const phaseTotal = phaseSeconds(phase, plan);
   const phaseProgress = phaseTotal === 0 ? 0 : 1 - secondsLeft / phaseTotal;
   const dashOffset = circumference * (1 - phaseProgress);
 
+  const positionLabel = (() => {
+    if (phase.kind === "warmup")
+      return `Riscaldamento ${phase.idx + 1}/${plan.warmup.length}`;
+    if (phase.kind === "work")
+      return `Esercizio ${phase.exerciseIdx + 1}/${
+        plan.exercises.length
+      } · Giro ${phase.round + 1}/${plan.rounds}`;
+    if (phase.kind === "rest")
+      return `Riposo · Prossimo: ${nextExercise?.name ?? "—"}`;
+    if (phase.kind === "roundRest")
+      return `Pausa giro ${phase.round + 1}/${plan.rounds - 1}`;
+    return "Transizione";
+  })();
+
   return (
-    <div className="space-y-5">
-      <div className="overflow-hidden rounded-full bg-slate-200">
+    <div className="space-y-4">
+      <div className="overflow-hidden rounded-full bg-slate-800 border border-slate-700">
         <div
-          className="h-2 bg-brand-500 transition-all"
+          className="h-2 bg-gradient-to-r from-sky-400 to-indigo-400 transition-all"
           style={{ width: `${progress}%` }}
         />
       </div>
 
       <div
-        className={`rounded-2xl p-5 text-center font-bold tracking-wider ${phaseColor}`}
+        className={`rounded-2xl p-3 text-center font-bold tracking-[0.2em] text-sm bg-gradient-to-r ${phaseAccent} text-white shadow-lg`}
       >
         {phaseLabel}
       </div>
 
-      <div className="flex flex-col items-center gap-4 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-        <div className="relative h-56 w-56">
-          <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
-            <circle
-              cx="100"
-              cy="100"
-              r={ringRadius}
-              className="stroke-slate-100"
-              strokeWidth="14"
-              fill="none"
-            />
-            <circle
-              cx="100"
-              cy="100"
-              r={ringRadius}
-              className={ringColor}
-              strokeWidth="14"
-              strokeLinecap="round"
-              fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={dashOffset}
-              style={{ transition: "stroke-dashoffset 1s linear" }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-6xl font-bold tabular-nums text-slate-900">
-              {secondsLeft}
-            </span>
-            <span className="text-xs uppercase tracking-wider text-slate-500">
-              secondi
-            </span>
-          </div>
-        </div>
-
-        {currentExercise && (
-          <div className="w-full text-center">
-            <div className="text-xs uppercase tracking-wider text-slate-500">
-              {phase.kind === "work"
-                ? `Esercizio ${
-                    "exerciseIdx" in phase ? phase.exerciseIdx + 1 : 0
-                  } / ${plan.exercises.length} · Giro ${
-                    ("round" in phase ? phase.round : 0) + 1
-                  } / ${plan.rounds}`
-                : phase.kind === "rest"
-                ? `Prossimo: ${
-                    nextExercise ? nextExercise.name : "—"
-                  }`
-                : `Pausa tra i giri (${
-                    "round" in phase ? phase.round + 1 : 0
-                  } / ${plan.rounds - 1})`}
+      <div className="card p-6 sm:p-8">
+        <div className="flex flex-col items-center gap-5">
+          <div className="relative h-56 w-56 sm:h-64 sm:w-64">
+            <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90">
+              <circle
+                cx="100"
+                cy="100"
+                r={ringRadius}
+                className="stroke-slate-800"
+                strokeWidth="14"
+                fill="none"
+              />
+              <circle
+                cx="100"
+                cy="100"
+                r={ringRadius}
+                className={ringColor}
+                strokeWidth="14"
+                strokeLinecap="round"
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-6xl sm:text-7xl font-bold tabular-nums text-white">
+                {secondsLeft}
+              </span>
+              <span className="mt-1 text-[10px] uppercase tracking-[0.3em] text-slate-400">
+                secondi
+              </span>
             </div>
-            <h3 className="mt-1 text-2xl font-bold text-slate-900">
-              {phase.kind === "work" ? currentExercise.name : "Recupera"}
-            </h3>
-            {phase.kind === "work" && (
-              <>
-                <div className="mx-auto mt-3 h-40 w-40">
-                  <ExerciseSvg
-                    id={currentExercise.id}
-                    className="h-full w-full"
-                  />
-                </div>
-                <p className="mt-3 text-sm text-slate-600">
-                  {currentExercise.description}
-                </p>
-                <p className="mt-1 text-xs italic text-slate-500">
-                  {currentExercise.tips}
-                </p>
-              </>
-            )}
-            {phase.kind !== "work" && nextExercise && (
-              <div className="mx-auto mt-3 h-32 w-32 opacity-60">
-                <ExerciseSvg
-                  id={nextExercise.id}
-                  className="h-full w-full"
-                />
-              </div>
-            )}
           </div>
-        )}
+
+          {currentExercise && (
+            <div className="w-full text-center">
+              <div className="text-xs uppercase tracking-wider text-slate-400">
+                {positionLabel}
+              </div>
+              <h3 className="mt-1 text-2xl font-bold text-white">
+                {phase.kind === "rest" || phase.kind === "warmupRest"
+                  ? "Recupera"
+                  : currentExercise.name}
+              </h3>
+
+              {(phase.kind === "work" || phase.kind === "warmup") && (
+                <>
+                  <div className="mx-auto mt-4 h-40 w-40 rounded-2xl bg-slate-900/60 border border-slate-800 p-2">
+                    <ExerciseSvg
+                      id={currentExercise.id}
+                      className="h-full w-full"
+                    />
+                  </div>
+                  <p className="mt-4 text-sm text-slate-300">
+                    {currentExercise.description}
+                  </p>
+                  <ol className="mx-auto mt-3 max-w-md space-y-1.5 text-left text-xs text-slate-400">
+                    {currentExercise.howTo.map((step, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-slate-500 shrink-0">
+                          {i + 1}.
+                        </span>
+                        <span>{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="mt-3 text-xs italic text-amber-300/80">
+                    💡 {currentExercise.tips}
+                  </p>
+                </>
+              )}
+
+              {(phase.kind === "rest" ||
+                phase.kind === "warmupRest" ||
+                phase.kind === "roundRest") &&
+                nextExercise && (
+                  <div className="mt-4">
+                    <div className="text-xs uppercase tracking-wider text-slate-500">
+                      Prossimo esercizio
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-slate-200">
+                      {nextExercise.name}
+                    </div>
+                    <div className="mx-auto mt-2 h-32 w-32 rounded-2xl bg-slate-900/60 border border-slate-800 p-2 opacity-80">
+                      <ExerciseSvg
+                        id={nextExercise.id}
+                        className="h-full w-full"
+                      />
+                    </div>
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         <button
           onClick={() => setRunning((r) => !r)}
-          className="rounded-xl bg-brand-600 py-3 font-semibold text-white shadow-sm hover:bg-brand-700"
+          className="btn-primary py-3"
         >
           {running ? "Pausa" : "Avvia"}
         </button>
-        <button
-          onClick={skip}
-          className="rounded-xl bg-slate-200 py-3 font-semibold text-slate-700 hover:bg-slate-300"
-        >
+        <button onClick={skip} className="btn-ghost py-3">
           Salta
         </button>
-        <button
-          onClick={reset}
-          className="rounded-xl bg-slate-200 py-3 font-semibold text-slate-700 hover:bg-slate-300"
-        >
+        <button onClick={reset} className="btn-ghost py-3">
           Reset
         </button>
+      </div>
+
+      <div className="text-center text-xs text-slate-500">
+        {isWarmupPhase
+          ? "Mobilità e attivazione muscolare"
+          : `${plan.workSeconds}s lavoro · ${plan.restSeconds}s riposo · giro ${
+              "round" in phase ? phase.round + 1 : 1
+            }/${plan.rounds}`}
       </div>
     </div>
   );
