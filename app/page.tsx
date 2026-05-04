@@ -35,37 +35,29 @@ export default function Home() {
   const [duration, setDuration] = useState<15 | 30>(30);
   const [goal, setGoal] = useState<Goal>("completo");
   const [equipment, setEquipment] = useState<Equipment[]>(["none"]);
-  const [calisthenics, setCalisthenics] = useState(true);
 
   const toggleEquipment = (eq: Equipment) => {
-    if (calisthenics) return;
     setEquipment((prev) => {
-      if (eq === "none") return prev.includes("none") ? prev : ["none"];
-      const without = prev.filter((p) => p !== "none");
-      return without.includes(eq)
-        ? without.filter((p) => p !== eq)
-        : [...without, eq];
+      const has = prev.includes(eq);
+      if (has) {
+        const next = prev.filter((p) => p !== eq);
+        return next.length === 0 ? ["none"] : next;
+      }
+      return [...prev, eq];
     });
   };
 
-  const toggleCalisthenics = () => {
-    if (calisthenics) {
-      setCalisthenics(false);
-      setEquipment(["none"]);
-    } else {
-      setCalisthenics(true);
-      setEquipment(["none"]);
-    }
-  };
+  const setPresetCalisthenics = () => setEquipment(["none"]);
+  const setPresetAll = () =>
+    setEquipment(["none", "weights", "ring", "kettlebell", "bands"]);
 
-  const effectiveEquipment: Equipment[] = calisthenics
-    ? ["none"]
-    : equipment.length === 0
-    ? ["none"]
-    : equipment;
+  const isCalisthenicsOnly =
+    equipment.length === 1 && equipment[0] === "none";
+  const includesBodyweight = equipment.includes("none");
+  const includesEquipment = equipment.some((e) => e !== "none");
 
   const start = () => {
-    const eq = effectiveEquipment.join(",");
+    const eq = (equipment.length === 0 ? ["none"] : equipment).join(",");
     router.push(
       `/workout?days=${days}&duration=${duration}&goal=${goal}&equipment=${eq}&session=0`
     );
@@ -177,73 +169,101 @@ export default function Home() {
 
         <Section
           title="Modalità & attrezzatura"
-          subtitle="Scegli cosa hai a disposizione"
+          subtitle="Combina corpo libero e attrezzi come preferisci"
           step={4}
         >
-          <button
-            type="button"
-            onClick={toggleCalisthenics}
-            className={`mb-3 w-full rounded-xl border px-4 py-3 text-left transition-all ${
-              calisthenics
-                ? "border-emerald-400/60 bg-emerald-500/10"
-                : "border-slate-800 bg-slate-900/40 hover:border-slate-700"
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div
-                  className={`text-sm font-semibold ${
-                    calisthenics ? "text-emerald-200" : "text-slate-100"
-                  }`}
-                >
-                  Solo calisthenics (corpo libero)
-                </div>
-                <div className="text-xs text-slate-400">
-                  Niente attrezzi: solo il tuo corpo.
-                </div>
-              </div>
-              <div
-                className={`h-6 w-11 rounded-full p-0.5 transition-colors ${
-                  calisthenics ? "bg-emerald-500" : "bg-slate-700"
-                }`}
-              >
-                <div
-                  className={`h-5 w-5 rounded-full bg-white transition-transform ${
-                    calisthenics ? "translate-x-5" : ""
-                  }`}
-                />
-              </div>
-            </div>
-          </button>
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={setPresetCalisthenics}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+                isCalisthenicsOnly
+                  ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-200"
+                  : "border-slate-700 bg-slate-900/40 text-slate-300 hover:bg-slate-800/60"
+              }`}
+            >
+              Solo calisthenics
+            </button>
+            <button
+              type="button"
+              onClick={setPresetAll}
+              className="rounded-full border border-slate-700 bg-slate-900/40 px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800/60 transition-all"
+            >
+              Tutto disponibile
+            </button>
+            {includesBodyweight && includesEquipment && (
+              <span className="ml-auto rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1.5 text-xs text-sky-200">
+                Corpo libero + attrezzi
+              </span>
+            )}
+          </div>
 
-          <div
-            className={`grid gap-2 sm:grid-cols-2 transition-opacity ${
-              calisthenics ? "opacity-40 pointer-events-none" : ""
-            }`}
-          >
+          <div className="grid gap-2 sm:grid-cols-2">
             {EQUIPMENT_ORDER.map((eq) => {
               const selected = equipment.includes(eq);
+              const isBodyweight = eq === "none";
               return (
                 <button
                   key={eq}
                   type="button"
                   onClick={() => toggleEquipment(eq)}
-                  className={`rounded-xl border px-4 py-3 text-left transition-all ${
+                  className={`relative rounded-xl border px-4 py-3 text-left transition-all ${
                     selected
-                      ? "border-sky-400/60 bg-sky-500/10 text-sky-200"
-                      : "border-slate-800 bg-slate-900/40 text-slate-300 hover:border-slate-700 hover:bg-slate-800/50"
+                      ? isBodyweight
+                        ? "border-emerald-400/60 bg-emerald-500/10"
+                        : "border-sky-400/60 bg-sky-500/10"
+                      : "border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-800/50"
                   }`}
                 >
-                  <div className="text-sm font-semibold">
-                    {EQUIPMENT_LABELS[eq]}
-                  </div>
-                  <div className="text-xs text-slate-400">
-                    {EQUIPMENT_HINT[eq]}
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div
+                        className={`text-sm font-semibold ${
+                          selected
+                            ? isBodyweight
+                              ? "text-emerald-200"
+                              : "text-sky-200"
+                            : "text-slate-100"
+                        }`}
+                      >
+                        {EQUIPMENT_LABELS[eq]}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {EQUIPMENT_HINT[eq]}
+                      </div>
+                    </div>
+                    <span
+                      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                        selected
+                          ? isBodyweight
+                            ? "border-emerald-400 bg-emerald-500"
+                            : "border-sky-400 bg-sky-500"
+                          : "border-slate-600"
+                      }`}
+                    >
+                      {selected && (
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-3.5 w-3.5 text-white"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 12l5 5L20 7" />
+                        </svg>
+                      )}
+                    </span>
                   </div>
                 </button>
               );
             })}
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Puoi selezionare più voci: il corpo libero si combina con qualsiasi
+            attrezzo.
+          </p>
         </Section>
 
         <button
