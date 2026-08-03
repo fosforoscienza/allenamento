@@ -27,6 +27,21 @@ cartella.
 Poi: trascina il PDF nell'app, regola le impostazioni se serve, premi **Crea
 opuscolo** e scarica il risultato.
 
+## Usarla su un altro computer
+
+Nella cartella c'è **`Opuscolo.html`**: la stessa app, ma con libreria e motore
+già incorporati in un unico file da 537 KB. Non ha bisogno di nient'altro.
+
+Copialo dove vuoi — chiavetta USB, AirDrop, email, Dropbox — e aprilo con un
+doppio clic. Funziona anche **su Windows e Linux**: è una normale pagina che
+gira nel browser, e l'unica parte legata al Mac è `crea-app.command`.
+
+Non serve installare niente, non serve internet (l'app non fa nessuna richiesta
+di rete: puoi provarla con il Wi-Fi spento) e il PDF resta sul computer.
+
+Se modifichi `index.html` o `booklet.js`, rigenera il file singolo con
+`node crea-file-unico.js`.
+
 ## Come stampare
 
 1. Apri il PDF prodotto in Anteprima e premi ⌘P.
@@ -73,10 +88,12 @@ fino a 3 pagine bianche in fondo. L'app te lo dice sempre nel riepilogo.
 
 | File | Contenuto |
 | --- | --- |
+| `Opuscolo.html` | **File unico autonomo**, da portare su altri computer |
 | `index.html` | Interfaccia dell'app |
 | `booklet.js` | Motore di imposizione (calcolo dell'ordine e composizione dei fogli) |
 | `vendor/pdf-lib.min.js` | [pdf-lib](https://pdf-lib.js.org), libreria PDF (licenza MIT, inclusa in `vendor/`) |
-| `crea-app.command` | Genera `Opuscolo.app` |
+| `crea-app.command` | Genera `Opuscolo.app` (solo macOS) |
+| `crea-file-unico.js` | Rigenera `Opuscolo.html` |
 | `icona.png` | Icona dell'app |
 
 Nessuna installazione, nessun `npm install`: la libreria è già inclusa.
